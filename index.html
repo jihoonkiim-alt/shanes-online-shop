@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shane's — Order Management</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=DM+Serif+Display&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f5f2;--surface:#fff;--border:#e5e0d8;
+  --accent:#c0392b;--accent-light:#fdf0ef;
+  --text:#1c1814;--muted:#8a7e74;
+  --ok:#1e7e45;--ok-bg:#eaf6ef;
+  --warn:#b06a00;--warn-bg:#fff8ed;
+  --new:#1a5fa8;--new-bg:#eef4fc;
+  --update:#7b3fa0;--update-bg:#f5eefa;
+  --dup:#555;--dup-bg:#f0efee;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+header{background:var(--text);padding:16px 32px;display:flex;align-items:center;gap:12px}
+header h1{font-family:'DM Serif Display',serif;font-size:20px;color:#fff}
+header .sub{font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase}
+
+.steps{display:flex;background:var(--surface);border-bottom:1px solid var(--border)}
+.step{flex:1;padding:14px 20px;display:flex;align-items:center;gap:10px;border-right:1px solid var(--border);opacity:.4;transition:.2s}
+.step:last-child{border-right:none}
+.step.active{opacity:1;background:var(--accent-light)}
+.step.done{opacity:.85}
+.sn{width:24px;height:24px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.step.active .sn{background:var(--accent);color:#fff}
+.step.done .sn{background:var(--ok);color:#fff}
+.sl{font-size:12px;font-weight:500}
+.ss{font-size:11px;color:var(--muted)}
+
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px;display:none;margin-bottom:16px}
+.panel.active{display:block}
+.ptitle{font-family:'DM Serif Display',serif;font-size:19px;margin-bottom:4px}
+.psub{font-size:13px;color:var(--muted);margin-bottom:24px}
+
+.upzone{border:2px dashed var(--border);border-radius:8px;padding:44px 20px;text-align:center;cursor:pointer;transition:.2s;background:var(--bg)}
+.upzone:hover,.upzone.drag{border-color:var(--accent);background:var(--accent-light)}
+.upzone input{display:none}
+.upico{font-size:32px;margin-bottom:10px}
+.upzone h3{font-size:15px;font-weight:600;margin-bottom:4px}
+.upzone p{font-size:12px;color:var(--muted)}
+
+textarea{width:100%;padding:12px;border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical;min-height:160px;background:var(--bg);outline:none;transition:.2s;line-height:1.7}
+textarea:focus{border-color:var(--accent);background:#fff}
+.fmt-hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.8}
+.fmt-hint code{background:#f0ede8;padding:2px 6px;border-radius:3px;font-family:monospace;font-size:11px}
+
+.btn{padding:10px 20px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:.15s;display:inline-flex;align-items:center;gap:7px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#a93226}
+.btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--bg)}
+.btn-ok{background:var(--ok);color:#fff}
+.btn-ok:hover{background:#186038}
+.btn-lg{padding:13px 26px;font-size:14px}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-row{display:flex;gap:10px;align-items:center;margin-top:20px;flex-wrap:wrap}
+
+.stats{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:20px}
+.stat{flex:1;padding:14px 16px;border-right:1px solid var(--border);text-align:center}
+.stat:last-child{border-right:none}
+.sv{font-size:22px;font-weight:700;font-family:'DM Serif Display',serif}
+.sl2{font-size:11px;color:var(--muted);margin-top:2px;font-weight:500}
+.sv.new{color:var(--new)}.sv.update{color:var(--update)}.sv.dup{color:var(--dup)}.sv.ok{color:var(--ok)}
+
+.tag{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap;letter-spacing:.3px}
+.tag-new{background:var(--new-bg);color:var(--new)}
+.tag-dup{background:var(--dup-bg);color:var(--dup)}
+.tag-update{background:var(--update-bg);color:var(--update)}
+.tag-ok{background:var(--ok-bg);color:var(--ok)}
+.tag-warn{background:var(--warn-bg);color:var(--warn)}
+
+.twrap{border:1px solid var(--border);border-radius:8px;overflow:hidden;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#f3f0eb;padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;letter-spacing:.5px;text-transform:uppercase}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.row-new td{background:#f8fbff}
+tr.row-update td{background:#fdf8ff}
+tr.row-dup td{background:#fafafa}
+tr:hover td{filter:brightness(.97)}
+
+.alert{padding:11px 14px;border-radius:6px;font-size:12px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px;line-height:1.6}
+.alert-info{background:#edf4ff;color:#1a4a8a;border:1px solid #c5d9f7}
+.alert-success{background:var(--ok-bg);color:var(--ok);border:1px solid #b0e0c2}
+.alert-warn{background:var(--warn-bg);color:var(--warn);border:1px solid #f5d9a8}
+
+.done-card{background:var(--ok-bg);border:1px solid #b0e0c2;border-radius:10px;padding:32px;text-align:center}
+.done-card h2{font-family:'DM Serif Display',serif;font-size:22px;color:var(--ok);margin-bottom:6px}
+.done-card p{color:var(--muted);font-size:13px;margin-bottom:18px}
+.dl-info{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 18px;max-width:400px;margin:0 auto 20px;text-align:left}
+.dl-row{display:flex;justify-content:space-between;font-size:12px;padding:5px 0}
+.dl-row:not(:last-child){border-bottom:1px solid var(--border)}
+.dl-row span:first-child{color:var(--muted)}
+.dl-row span:last-child{font-weight:600}
+
+.sec-label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.diff-old{text-decoration:line-through;color:var(--muted);font-size:11px;display:block}
+.diff-new{color:var(--update);font-weight:500}
+
+@media(max-width:640px){
+  .steps{flex-direction:column}
+  .step{border-right:none;border-bottom:1px solid var(--border)}
+  .step:last-child{border-bottom:none}
+  .stats{flex-wrap:wrap}
+  .stat{min-width:50%}
+  header{padding:12px 16px}
+  .wrap{padding:16px 12px}
+  .panel{padding:18px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div><h1>Shane's</h1></div>
+  <span class="sub">/ Order Management & Customer DB</span>
+</header>
+
+<div class="steps">
+  <div class="step active" id="st1"><div class="sn">1</div><div><div class="sl">Upload DB File</div><div class="ss">Current customer database</div></div></div>
+  <div class="step" id="st2"><div class="sn">2</div><div><div class="sl">Enter Today's Orders</div><div class="ss">Paste or type order info</div></div></div>
+  <div class="step" id="st3"><div class="sn">3</div><div><div class="sl">Review & Match</div><div class="ss">New / duplicate / address change</div></div></div>
+  <div class="step" id="st4"><div class="sn">4</div><div><div class="sl">Download Files</div><div class="ss">Updated DB + shipping sheet</div></div></div>
+</div>
+
+<div class="wrap">
+
+<!-- PANEL 1 -->
+<div class="panel active" id="panel1">
+  <div class="ptitle">Upload Customer DB File</div>
+  <div class="psub">Upload the Excel file you're currently using as your customer database.</div>
+  <div class="upzone" id="dz1" onclick="document.getElementById('dbFile').click()">
+    <input type="file" id="dbFile" accept=".xlsx,.xls" onchange="loadDB(event)">
+    <div class="upico">📂</div>
+    <h3>Drag & drop or click to select</h3>
+    <p>File must contain CUSTOMER INFO and ENCODE sheets</p>
+  </div>
+  <div id="dbStatus" style="margin-top:12px"></div>
+  <div class="btn-row">
+    <button class="btn btn-primary" id="toStep2" onclick="goStep(2)" disabled>Next →</button>
+  </div>
+</div>
+
+<!-- PANEL 2 -->
+<div class="panel" id="panel2">
+  <div class="ptitle">Enter Today's Orders</div>
+  <div class="psub">Paste customer info received today — one customer per line.</div>
+
+  <div class="sec-label">Paste as text</div>
+  <textarea id="orderText" placeholder="One customer per line. Examples:
+MARIA SANTOS / 010-1234-5678 / 경기도 수원시 팔달구 인계로 123, 101동 456호
+이영희 / 010-9876-5432 / 서울특별시 강남구 테헤란로 100
+JANE KIM, 010-5555-1234, 부산광역시 해운대구 해운대로 123"></textarea>
+  <div class="fmt-hint">
+    Separator: <code>/</code> or <code>,</code> or <code>tab</code> — Order: <strong>Name / Phone / Address</strong><br>
+    Phone number is optional — <strong>Name / Address</strong> alone is accepted.
+  </div>
+
+  <div style="margin-top:20px" class="sec-label">Or upload an order file (optional)</div>
+  <div class="upzone" style="padding:20px" onclick="document.getElementById('orderFile').click()">
+    <input type="file" id="orderFile" accept=".xlsx,.xls,.csv" onchange="loadOrderFile(event)">
+    <p style="font-size:13px;">📎 Upload order list file (.xlsx / .csv)</p>
+  </div>
+  <div id="orderFileStatus" style="margin-top:8px"></div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
+    <button class="btn btn-primary" onclick="runMatch()">Run Match →</button>
+  </div>
+</div>
+
+<!-- PANEL 3 -->
+<div class="panel" id="panel3">
+  <div class="ptitle">Match Results</div>
+  <div class="psub">New customers will be added to the DB. Updated addresses will be applied. You can edit any field directly.</div>
+
+  <div class="stats">
+    <div class="stat"><div class="sv new" id="cnt_new">0</div><div class="sl2">🆕 New</div></div>
+    <div class="stat"><div class="sv update" id="cnt_upd">0</div><div class="sl2">🔄 Address Changed</div></div>
+    <div class="stat"><div class="sv dup" id="cnt_dup">0</div><div class="sl2">✓ Same</div></div>
+    <div class="stat"><div class="sv ok" id="cnt_tot">0</div><div class="sl2">Total Orders</div></div>
+  </div>
+
+  <div id="matchAlert"></div>
+
+  <div class="twrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Status</th>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Address (Input → DB)</th>
+          <th>Validation</th>
+        </tr>
+      </thead>
+      <tbody id="matchBody"></tbody>
+    </table>
+  </div>
+
+  <div class="btn-row" style="margin-top:20px">
+    <button class="btn btn-secondary" onclick="goStep(2)">← Re-enter</button>
+    <button class="btn btn-ok btn-lg" onclick="generateFiles()">📥 Update DB & Generate Shipping Sheet</button>
+  </div>
+</div>
+
+<!-- PANEL 4 -->
+<div class="panel" id="panel4">
+  <div class="done-card">
+    <div style="font-size:40px;margin-bottom:10px">✅</div>
+    <h2>Ready to Download!</h2>
+    <p>DB updated. Download the file below — it contains both ENCODE and CUSTOMER INFO sheets.</p>
+    <div class="dl-info" id="dlInfo"></div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-ok btn-lg" onclick="downloadDB()">📥 Download File (ENCODE + CUSTOMER INFO)</button>
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn btn-secondary" onclick="resetAll()">Start New Order</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+let dbWb = null, dbCustomers = [], orderList = [], matchResult = [], outDbWb = null;
+const TODAY = (() => {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+})();
+
+function goStep(n) {
+  [1,2,3,4].forEach(i => {
+    document.getElementById('st'+i).className = 'step'+(i===n?' active':i<n?' done':'');
+    document.getElementById('panel'+i).className = 'panel'+(i===n?' active':'');
+  });
+}
+
+// ── STEP 1: Load DB ──
+const dz1 = document.getElementById('dz1');
+dz1.addEventListener('dragover', e => { e.preventDefault(); dz1.classList.add('drag'); });
+dz1.addEventListener('dragleave', () => dz1.classList.remove('drag'));
+dz1.addEventListener('drop', e => { e.preventDefault(); dz1.classList.remove('drag'); if (e.dataTransfer.files[0]) loadDB({target:{files:e.dataTransfer.files}}); });
+
+function loadDB(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      dbWb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      const ws = dbWb.Sheets['CUSTOMER INFO'];
+      if (!ws) throw new Error("'CUSTOMER INFO' sheet not found.");
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+      dbCustomers = rows.slice(1).filter(r => r[0]).map(r => ({
+        name: norm(r[0]), phone: String(r[1]||'').trim(),
+        phone2: String(r[2]||'').trim(), addr: String(r[3]||'').trim(), memo: String(r[4]||'').trim()
+      }));
+      document.getElementById('dbStatus').innerHTML =
+        `<div class="alert alert-success">✅ ${file.name} — ${dbCustomers.length} customers loaded</div>`;
+      document.getElementById('toStep2').disabled = false;
+    } catch(err) {
+      document.getElementById('dbStatus').innerHTML = `<div class="alert alert-warn">❌ ${err.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── STEP 2: Order input ──
+function loadOrderFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+      const start = rows[0] && rows[0].some(c => /name|phone|address|이름|전화|주소/i.test(String(c))) ? 1 : 0;
+      const parsed = rows.slice(start).filter(r => r.some(c=>c)).map(r => parseOrderRow(r)).filter(Boolean);
+      if (parsed.length) {
+        const existing = document.getElementById('orderText').value.trim();
+        const lines = parsed.map(p => [p.name, p.phone, p.addr].filter(Boolean).join(' / ')).join('\n');
+        document.getElementById('orderText').value = (existing ? existing+'\n' : '') + lines;
+        document.getElementById('orderFileStatus').innerHTML = `<div class="alert alert-info">📎 ${parsed.length} orders added from file</div>`;
+      }
+    } catch(err) {
+      document.getElementById('orderFileStatus').innerHTML = `<div class="alert alert-warn">❌ ${err.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseOrderRow(r) {
+  const cells = r.map(c => String(c||'').trim()).filter(Boolean);
+  if (!cells.length) return null;
+  if (cells.length === 1) return {name:cells[0], phone:'', addr:''};
+  let pi = cells.findIndex(c => /^0\d[\d-]{8,10}$/.test(c.replace(/[- ]/g,'')));
+  if (cells.length === 2) return pi===1 ? {name:cells[0],phone:cells[1],addr:''} : {name:cells[0],phone:'',addr:cells[1]};
+  if (pi === -1) return {name:cells[0], phone:'', addr:cells.slice(1).join(' ')};
+  const addrCells = cells.filter((_,i) => i !== pi && i !== (pi>0?0:1));
+  return {name:pi>0?cells[0]:cells[1]||'', phone:cells[pi], addr:addrCells.join(' ')};
+}
+
+function parseTextInput(text) {
+  return text.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+    let parts;
+    if (line.includes('\t')) parts = line.split('\t');
+    else if (line.includes('/')) parts = line.split('/').map(s=>s.trim());
+    else {
+      parts = line.split(',');
+      if (parts.length > 3) parts = [parts[0], parts[1], parts.slice(2).join(',')];
+    }
+    parts = parts.map(s=>s.trim()).filter(Boolean);
+    if (!parts.length) return null;
+    if (parts.length === 1) return {name:parts[0], phone:'', addr:''};
+    let pi = parts.findIndex(p => /^0\d[\d-]{8,}$/.test(p.replace(/[- ]/g,'')));
+    if (parts.length === 2) {
+      if (pi===1) return {name:parts[0],phone:parts[1],addr:''};
+      if (pi===0) return {name:'',phone:parts[0],addr:parts[1]};
+      return {name:parts[0],phone:'',addr:parts[1]};
+    }
+    if (pi===-1) return {name:parts[0],phone:'',addr:parts.slice(1).join(' ')};
+    const name = pi>0 ? parts[0] : parts[1]||'';
+    const addr = parts.filter((_,i)=>i!==pi&&i!==(pi>0?0:1)).join(' ');
+    return {name, phone:parts[pi], addr};
+  }).filter(Boolean);
+}
+
+// ── STEP 3: Match ──
+const KAKAO_KEY = '672a8b6c38733f474c5b34902cfe4da3';
+
+function norm(s) { return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
+function normPhone(s) { return String(s||'').replace(/[^0-9]/g,''); }
+function cleanAddr(a) { return String(a||'').replace(/(\d+동)(\d+호)/,'$1 $2').replace(/\s{2,}/g,' ').trim(); }
+
+// 카카오 주소 API — 표준 도로명 주소 반환
+async function kakaoAddr(query) {
+  if (!query || query.trim().length < 3) return null;
+  try {
+    const headers = {'Authorization': 'KakaoAK ' + KAKAO_KEY};
+    // 1차: 주소 검색 — road_address 개별 필드로 완전한 주소 조합
+    const r1 = await fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(query) + '&size=1', {headers});
+    if (r1.ok) {
+      const d1 = await r1.json();
+      if (d1.documents && d1.documents.length > 0) {
+        const doc = d1.documents[0];
+        const road = doc.road_address;
+        if (road) {
+          // 시도 + 시군구 + 도로명 + 건물번호 조합
+          const num = road.main_building_no + (road.sub_building_no && road.sub_building_no !== '0' ? '-' + road.sub_building_no : '');
+          const base = [road.region_1depth_name, road.region_2depth_name, road.road_name, num].filter(Boolean).join(' ');
+          // (동이름, 건물명) 괄호 조합 — 있는 것만
+          const bracketParts = [road.region_3depth_name, road.building_name].filter(Boolean);
+          const bracket = bracketParts.length ? ' (' + bracketParts.join(', ') + ')' : '';
+          return {full: base + bracket, ok:true};
+        }
+        // 지번주소 fallback
+        const jibun = doc.address;
+        if (jibun) {
+          const num = jibun.main_address_no + (jibun.sub_address_no && jibun.sub_address_no !== '0' ? '-' + jibun.sub_address_no : '');
+          const base = [jibun.region_1depth_name, jibun.region_2depth_name, jibun.region_3depth_name, num].filter(Boolean).join(' ');
+          return {full: base, ok:true};
+        }
+      }
+    }
+    // 2차: 키워드 검색 — road_address 객체에서 필드 조합
+    const r2 = await fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(query) + '&size=1', {headers});
+    if (r2.ok) {
+      const d2 = await r2.json();
+      if (d2.documents && d2.documents.length > 0) {
+        const doc2 = d2.documents[0];
+        // road_address 객체가 있으면 필드 조합
+        if (doc2.road_address) {
+          const r = doc2.road_address;
+          const num = r.main_building_no + (r.sub_building_no && r.sub_building_no !== '0' ? '-' + r.sub_building_no : '');
+          const base = [r.region_1depth_name, r.region_2depth_name, r.road_name, num].filter(Boolean).join(' ');
+          const bracketParts = [r.region_3depth_name, r.building_name].filter(Boolean);
+          const bracket = bracketParts.length ? ' (' + bracketParts.join(', ') + ')' : '';
+          return {full: base + bracket, ok:true};
+        }
+        // 없으면 road_address_name 그대로 사용
+        const addr = doc2.road_address_name || doc2.address_name;
+        if (addr) return {full: addr, ok:true};
+      }
+    }
+    return null;
+  } catch(e) { return null; }
+}
+
+// 원본에서 동/호수 상세정보 추출 (표준주소에 없는 부분)
+function extractDetail(raw, standard) {
+  if (!raw || !standard) return '';
+  const m = raw.match(/,?\s*(\d+동\s*\d+호|[가-힣]+동\s*\d+호|\d+호)/);
+  if (m && !standard.includes(m[1].trim())) return m[1].trim();
+  return '';
+}
+
+async function runMatch() {
+  const text = document.getElementById('orderText').value.trim();
+  if (!text) { alert('Please enter order information.'); return; }
+  orderList = parseTextInput(text);
+  if (!orderList.length) { alert('No orders parsed. Please check the format.'); return; }
+
+  const btn = document.querySelector('#panel2 .btn-primary');
+  btn.disabled = true;
+  btn.innerHTML = '🔍 Verifying addresses...';
+
+  // 카카오 API로 주소 표준화
+  const resolved = await Promise.all(orderList.map(async o => {
+    const raw = cleanAddr(o.addr);
+    if (!raw) return {raw, std:'', ok:false};
+    const result = await kakaoAddr(raw);
+    if (result) {
+      const detail = extractDetail(raw, result.full);
+      // 순서: 기본주소 + 동호수 + (동이름, 건물명)
+      // result.full = "광주광역시 북구 서강로 160 (운암동, 우성아파트)"
+      // → 괄호 앞에 동호수 삽입
+      let std;
+      if (detail) {
+        const bracketIdx = result.full.indexOf(' (');
+        if (bracketIdx !== -1) {
+          // 괄호 앞에 동호수 끼워넣기
+          std = result.full.slice(0, bracketIdx) + ', ' + detail + result.full.slice(bracketIdx);
+        } else {
+          std = result.full + ', ' + detail;
+        }
+      } else {
+        std = result.full;
+      }
+      return {raw, std, ok:true};
+    }
+    return {raw, std:raw, ok:false};
+  }));
+
+  btn.disabled = false;
+  btn.innerHTML = 'Run Match →';
+
+  matchResult = orderList.map((o, i) => {
+    const nName = norm(o.name), nPhone = normPhone(o.phone);
+    const addrRes = resolved[i];
+    const finalAddr = addrRes.std || cleanAddr(o.addr);
+    const verify = addrRes.ok ? {ok:true, msg:'Verified'} : {ok:false, msg: finalAddr ? 'Could not verify' : 'No address'};
+
+    let found = dbCustomers.find(c => norm(c.name) === nName);
+    if (!found && nPhone.length >= 9)
+      found = dbCustomers.find(c => normPhone(c.phone) === nPhone || normPhone(c.phone2) === nPhone);
+
+    let status, db_addr = '', final_addr = finalAddr;
+    if (!found) {
+      status = 'new';
+    } else {
+      db_addr = found.addr;
+      if (!finalAddr || finalAddr === cleanAddr(db_addr)) { status = 'dup'; final_addr = db_addr; }
+      else { status = 'update'; final_addr = finalAddr; }
+    }
+    const finalName = /^[a-zA-Z\s.'-]+$/.test((o.name||'').trim()) ? (o.name||'').trim().toUpperCase() : (o.name||'').trim();
+    return {idx:i+1, name:finalName||(found?found.name:''), phone:o.phone||(found?found.phone:''),
+      input_addr:finalAddr, db_addr, final_addr, status, verify, _found:found};
+  });
+
+  goStep(3);
+  renderMatch();
+}
+
+function renderMatch() {
+  const nw=matchResult.filter(r=>r.status==='new').length;
+  const up=matchResult.filter(r=>r.status==='update').length;
+  const du=matchResult.filter(r=>r.status==='dup').length;
+  document.getElementById('cnt_new').textContent=nw;
+  document.getElementById('cnt_upd').textContent=up;
+  document.getElementById('cnt_dup').textContent=du;
+  document.getElementById('cnt_tot').textContent=matchResult.length;
+
+  const noAddr = matchResult.filter(r=>r.status==='new'&&!r.final_addr).length;
+  document.getElementById('matchAlert').innerHTML = noAddr
+    ? `<div class="alert alert-warn">⚠️ <strong>${noAddr} new customer(s)</strong> have no address. Please fill them in below.</div>`
+    : '';
+
+  const tagMap={new:'tag-new',dup:'tag-dup',update:'tag-update'};
+  const labelMap={new:'🆕 New',dup:'✓ Same',update:'🔄 Address Changed'};
+  const rowClass={new:'row-new',dup:'row-dup',update:'row-update'};
+
+  document.getElementById('matchBody').innerHTML = matchResult.map((r,i) => {
+    const vTag = r.verify.ok
+      ? `<span class="tag tag-ok">✓ OK</span>`
+      : `<span class="tag tag-warn">⚠ ${r.verify.msg}</span>`;
+    let addrCell = '';
+    if (r.status==='dup') {
+      addrCell=`<span style="color:var(--muted);font-size:12px;">${esc(r.db_addr)}</span>`;
+    } else if (r.status==='update') {
+      addrCell=`<span class="diff-old">${esc(r.db_addr)}</span>
+        <span class="diff-new" contenteditable="true" onblur="matchResult[${i}].final_addr=this.textContent.trim()">${esc(r.final_addr)}</span>`;
+    } else {
+      addrCell=`<span contenteditable="true" style="display:inline-block;min-width:200px;border:1px solid ${r.final_addr?'var(--border)':'var(--accent)'};border-radius:4px;padding:3px 7px;font-size:12px;background:${r.final_addr?'#fff':'#fff8f7'}"
+        onblur="matchResult[${i}].final_addr=this.textContent.trim()">${esc(r.final_addr)}</span>`;
+    }
+    return `<tr class="${rowClass[r.status]}">
+      <td style="color:var(--muted)">${r.idx}</td>
+      <td><span class="tag ${tagMap[r.status]}">${labelMap[r.status]}</span></td>
+      <td><span contenteditable="true" style="display:inline-block;padding:2px 4px;border-radius:3px" onblur="matchResult[${i}].name=this.textContent.trim()">${esc(r.name)}</span></td>
+      <td><span contenteditable="true" style="display:inline-block;padding:2px 4px;border-radius:3px" onblur="matchResult[${i}].phone=this.textContent.trim()">${esc(r.phone)}</span></td>
+      <td style="max-width:320px">${addrCell}</td>
+      <td>${vTag}</td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── STEP 4: Generate files ──
+function generateFiles() {
+  let updatedDB = [...dbCustomers];
+  matchResult.forEach(r => {
+    const nName=norm(r.name), nPhone=normPhone(r.phone);
+    let idx=updatedDB.findIndex(c=>norm(c.name)===nName);
+    if (idx===-1&&nPhone.length>=9) idx=updatedDB.findIndex(c=>normPhone(c.phone)===nPhone);
+    if (r.status==='new') updatedDB.push({name:r.name,phone:r.phone,phone2:'',addr:r.final_addr,memo:''});
+    else if (r.status==='update'&&idx>=0) updatedDB[idx]={...updatedDB[idx],addr:r.final_addr};
+  });
+  updatedDB.sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+
+  const newWb = XLSX.utils.book_new();
+
+  // ENCODE sheet
+  const encodeHeaders=['받는분성명','받는분전화번호','받는분기타연락처','받는분주소(전체, 분할)','품목명','운임구분','기본운임','박스수량','배송메세지1'];
+  const encodeRows=[encodeHeaders];
+  matchResult.forEach((r,i)=>{
+    const row=i+2;
+    encodeRows.push([r.name,
+      {f:`IF($A${row}="","",VLOOKUP($A${row},'CUSTOMER INFO'!$A:$E,2,FALSE))`},
+      null,
+      {f:`IF($A${row}="","",VLOOKUP($A${row},'CUSTOMER INFO'!$A:$E,4,FALSE))`},
+      '생활용품 (잡화/유리제품)','선불',3200,1,'★위탁사진 꼭 찍어주세요★']);
+  });
+  for (let i=matchResult.length;i<matchResult.length+20;i++){
+    const row=i+2;
+    encodeRows.push([null,
+      {f:`IF($A${row}="","",VLOOKUP($A${row},'CUSTOMER INFO'!$A:$E,2,FALSE))`},
+      null,
+      {f:`IF($A${row}="","",VLOOKUP($A${row},'CUSTOMER INFO'!$A:$E,4,FALSE))`},
+      null,null,null,null,null]);
+  }
+  const wsEncode=XLSX.utils.aoa_to_sheet(encodeRows);
+  wsEncode['!cols']=[{wch:22},{wch:16},{wch:14},{wch:50},{wch:20},{wch:8},{wch:10},{wch:8},{wch:24}];
+  XLSX.utils.book_append_sheet(newWb,wsEncode,'ENCODE');
+
+  // CUSTOMER INFO sheet
+  const ciRows=[['고객명','전화번호','기타연락처','주소(전체, 분할)','메모']];
+  updatedDB.forEach(c=>ciRows.push([c.name,c.phone,c.phone2||'',c.addr,c.memo||'']));
+  const wsCI=XLSX.utils.aoa_to_sheet(ciRows);
+  wsCI['!cols']=[{wch:22},{wch:16},{wch:14},{wch:60},{wch:20}];
+  XLSX.utils.book_append_sheet(newWb,wsCI,'CUSTOMER INFO');
+
+  outDbWb=newWb;
+  const nw=matchResult.filter(r=>r.status==='new').length;
+  const up=matchResult.filter(r=>r.status==='update').length;
+  document.getElementById('dlInfo').innerHTML=`
+    <div class="dl-row"><span>Today's orders</span><span>${matchResult.length}</span></div>
+    <div class="dl-row"><span>New customers added</span><span>${nw}</span></div>
+    <div class="dl-row"><span>Addresses updated</span><span>${up}</span></div>
+    <div class="dl-row"><span>Total DB size</span><span>${updatedDB.length} customers</span></div>
+    <div class="dl-row"><span>Shipping fee</span><span>Prepaid ₩3,200</span></div>`;
+  goStep(4);
+}
+
+function downloadDB(){
+  if (!outDbWb) return;
+  XLSX.writeFile(outDbWb, `CJ운암_customer_info_RB_shop_${TODAY}.xlsx`);
+}
+function resetAll(){
+  dbWb=null;dbCustomers=[];orderList=[];matchResult=[];outDbWb=null;
+  document.getElementById('dbStatus').innerHTML='';
+  document.getElementById('orderText').value='';
+  document.getElementById('orderFileStatus').innerHTML='';
+  document.getElementById('toStep2').disabled=true;
+  document.getElementById('dbFile').value='';
+  document.getElementById('orderFile').value='';
+  goStep(1);
+}
+</script>
+</body>
+</html>
